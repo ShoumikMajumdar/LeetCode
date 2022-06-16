@@ -2,6 +2,7 @@ import math
 from collections import Counter
 from collections import defaultdict
 from multiprocessing.dummy import Array
+from re import A
 def MaxDifference(array):
     """
     Find the max diff between a[i] and a[j] such that j>1
@@ -47,7 +48,7 @@ def FreqInSortedArray(array):
     
     Print In Place:
         Space: O(1)
-        TimeL O(n)
+        Time: O(n)
     """
     # Dict method: Traverse through array and keep track of elements and freq in a dict.
     # res = {}
@@ -243,37 +244,52 @@ def MaxSumCircular(array):
     Min_sum = array[0]
     sum = array[0]
 
-    # Min sum kadanes
     for i in range(1,len(array)):
         sum = min(sum+array[i],array[i])
         Min_sum = min(Min_sum,sum)
 
     print(f"Min sum {Min_sum}")
 
-    # Max circular
-    Max_circular_sum = max(Max_sum, total_sum - Min_sum)
-
-
     #  if max_sum is negetive, return max_sum. If this if is not written, fails when input is all negetive.
     if Max_sum<0:
         return Max_sum
+
+    # Max circular
+    Max_circular_sum = max(Max_sum, total_sum - Min_sum)
 
     return Max_circular_sum
 
 def majorityElement(array):
     """
-    Given an array, return all indices of majority elements. Najority element is that which has occurerd more than n/2 times in the array where n is length of array.
+    Given an array, return index of majority elements. Najority element is that which has occurerd more than n/2 times in the array where n is length of array.
+
+    Naive:
+        Space: O(1)
+        Time: O(n^2)
 
     Dict Method:
         Space: O(n)
         Time : O(n)
-    
-    Sort Method:
-        Space: O(1)
+
+    Maurice Voting:
         Time: O(n)
+        Space: O(1)
     """
-    
-    # # Dict method
+
+    # Naive Method
+    # n = len(array)
+    # for i in range(len(array)):
+    #     c = 1
+    #     for j in range(i+1, len(array)):
+    #         if array[j] == array[i]:
+    #             c+=1
+        
+    #     if c>n/2:
+    #         return i
+
+    # return -1
+
+    # Dict method
     # res = {}
     # n = len(array)
     # for i in range(len(array)):
@@ -290,8 +306,111 @@ def majorityElement(array):
     #         print(index_list)
 
 
+    # Maurics Voting Method: 
+    # In phase 1, we find a candidate. 
+    #   Initially candidate is set as the first element (index) and counter = 1. We loop from 1 to n. if a[i] is same as candidate, we increase counter, else we decrese counter.
+    #   If c becomes 0, we reset the candidate as current element i and reset counter to 1
+
+    # In phase 2 we simply traverse the array and count the number of occurence for the final candidate. If we knew for sure that a majority element exists, we wouldnt need phase 2.
+
+    n = len(array)
+
+    # Phase 1: Candidate selection
+    candidate = 0       # Initialize candidate as element at index 0
+    c = 1
+    for i in range(1,len(array)):
+        if array[i] == array[i-1]:      # if current element is same as candidate element counter ++, else counter --
+            c+=1
+        else:                           
+            c-=1
+
+        if c == 0:                      # If counter == 0, we update candidate to be current element.
+            candidate = i
+            c = 1
+    
+    # Phase 2: Majority check for selected candidate.
+    c = 0
+    for i in range(len(array)):         # Traverse through the array and count occurence of candidate element.
+        if array[i] == array[candidate]:
+            c+=1
+    
+    if c > n/2:
+        return candidate
+    
+    return -1
+
+
+def MinFlips(array):
+    
+    groupOnes = 0
+    groupZero = 0
+
+    if array[0] == 0:
+        groupZero+=1
+    else:
+        groupOnes+=1
+
+    for i in range(1,len(array)):
+        if array[i] == 0 and array[i-1] == 1:
+            groupZero+=1
+        
+        elif  array[i] == 1 and array[i-1] == 0:
+            groupOnes+=1
+
+    if groupZero < groupOnes:
+        flip = 0
+    else:
+        flip = 1
+
+    for i in range(len(array)):
+        if array[i] == flip:
+            print(f"Flip index {i}")
+
+def MaxSumOfK(array,k):
+    """
+    Given an array find the max sum of k consecutive elements.
+    Naive:
+        Time: O(n^2)
+        Space: O(1)
+
+    Sliding Window:
+        Time = O(n)
+        Space: O(1)
+    """
+
+    # # Naive
+    # MAX = -math.inf
+    # for i in range(len(array)-k + 1):
+    #     sum = 0
+    #     for j in range(i,i+k):
+    #         sum+=array[j]
+    #         MAX = max(MAX,sum)
+
+    #Sliding Window
+    Max = -math.inf
+    c = 1
+    sum = 0
+
+    for i in range(k):
+        sum+=array[i]
+
+    Max = max(Max,sum)
+
+    for i in range(k,len(array)):
+        sum = sum - array[i-k] + array[i]
+        Max = max(Max,sum)
+
+    return Max
+
+
+def SubarrayWithGivenSum(array,n):
+    """
+    Given an array of Non Negetive imtegers, find if there exists an array with the given sum
+    """
+    
+
 def main():
-    array = [8,3,4,8,8]
+    array = [1,4,20,3,10,5] # [2,5,3,1]
     # print(f"Max difference is : {MaxDifference(array)}")
     # print(f'Max Frequencies in a sorted array : {FreqInSortedArray(array)}')
     #print(f"Max profit : {stockBuySellOne(array)}")
@@ -300,7 +419,10 @@ def main():
     #print(MaxSumSubarray(array))
     #print(MaxLengthEvenOdd(array))
     #print(MaxSumCircular(array))
-    majorityElement(array)
+    #print(majorityElement(array))
+    #print(f"Minimum group flips {MinFlips(array)}")
+    #print(MaxSumOfK(array,3))
+    print(SubarrayWithGivenSum(array,23))
 
 
 if __name__ == '__main__':
