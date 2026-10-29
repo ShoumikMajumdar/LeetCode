@@ -13,6 +13,7 @@ posts straight to your phone (faster; no LLM in the loop).
     python3 duo_tracker.py --selftest
 """
 import argparse, json, math, random, sys, time, urllib.parse, urllib.request
+from concurrent.futures import ThreadPoolExecutor
 
 HOME = (42.3464, -71.1627)  # Brighton, Boston
 RADIUS_MI = 45
@@ -75,44 +76,56 @@ def emit(kind, **kw):
 
 def ntfy(topic, store, part, title):
     storage, color, price = SKUS[part]
-    link = "https://www.apple.com/shop/product/" + part
     req = urllib.request.Request(
         "https://ntfy.sh/" + topic, method="POST",
         data=f"{title or 'iPhone Duo ' + storage + ' ' + color} in stock at {store} - GO".encode(),
-        headers={"Title": "DUO IN STOCK", "Priority": "5", "Tags": "rotating_light", "Click": link})
+        headers={"Title": "DUO IN STOCK", "Priority": "5", "Tags": "rotating_light",
+                 "Click": "https://www.apple.com/shop/product/" + part})
     try:
         urllib.request.urlopen(req, timeout=5)
     except Exception as e:
         emit("ntfy_error", error=str(e))
 
 
+POOL = ThreadPoolExecutor(max_workers=16)
+
+
+def _fetch_one(z, parts):
+    try:
+        return fetch(z, parts)
+    except Exception as e:
+        emit("fetch_error", zip=z, error=str(e)[:120])
+        return None
+
+
 def poll(parts, seen, topic):
-    for z in SEED_ZIPS:
-        try:
-            resp = fetch(z, parts)
-        except Exception as e:
-            emit("fetch_error", zip=z, error=str(e)[:120])
-            continue
+    """One sweep: query every seed ZIP in parallel, merge, then diff against the last sweep."""
+    t0 = time.monotonic()
+    resps = [r for r in POOL.map(lambda z: _fetch_one(z, parts), SEED_ZIPS) if r]
+    live, checked, hits = set(), set(), {}
+    for resp in resps:
+        for s in (((resp.get("body") or {}).get("content") or {}).get("pickupMessage") or {}).get("stores") or []:
+            checked.add(s.get("storeNumber"))
         for s, part, title in available(resp, parts):
-            if not in_range(s):
-                continue
-            key = (s.get("storeNumber"), part)
-            if key in seen:
-                continue
-            seen.add(key)
-            storage, color, price = SKUS[part]
-            emit("IN_STOCK", store=s.get("storeName"), city=s.get("city"), state=s.get("state"),
-                 store_id=s.get("storeNumber"), part=part, model=f"iPhone Duo {storage} {color}",
-                 price=price, link="https://www.apple.com/shop/product/" + part)
-            if topic:
-                ntfy(topic, s.get("storeName"), part, title)
-        # Anything previously seen but no longer available can alert again next restock.
-        live = {(s.get("storeNumber"), p) for s, p, _ in available(resp, parts)}
-        stores_here = {s.get("storeNumber") for s in
-                       (((resp.get("body") or {}).get("content") or {}).get("pickupMessage") or {}).get("stores") or []}
-        for k in [k for k in seen if k[0] in stores_here and k not in live]:
-            seen.discard(k)
-            emit("SOLD_OUT", store_id=k[0], part=k[1])
+            if in_range(s):
+                key = (s.get("storeNumber"), part)
+                live.add(key)
+                hits.setdefault(key, (s, title))
+    for key in live - seen:
+        s, title = hits[key]
+        part = key[1]
+        if topic:  # push first, off-thread: nothing below may delay the phone
+            POOL.submit(ntfy, topic, s.get("storeName"), part, title)
+        storage, color, price = SKUS[part]
+        emit("IN_STOCK", store=s.get("storeName"), city=s.get("city"), state=s.get("state"),
+             store_id=key[0], part=part, model=f"iPhone Duo {storage} {color}", price=price,
+             link="https://www.apple.com/shop/product/" + part,
+             detect_ms=round((time.monotonic() - t0) * 1000))
+    # Only clear stores this sweep actually saw, so a failed request can't fake a restock.
+    for key in [k for k in seen if k[0] in checked and k not in live]:
+        emit("SOLD_OUT", store_id=key[0], part=key[1])
+    seen.difference_update({k for k in seen if k[0] in checked} - live)
+    seen.update(live)
 
 
 def selftest():
@@ -142,7 +155,7 @@ def selftest():
     seen, out = set(), []
     global emit
     real = emit
-    emit = lambda kind, **kw: out.append((kind, kw.get("store_id")))
+    emit = lambda kind, **kw: out.append((kind, kw.get("store_id"))) if kind in ("IN_STOCK", "SOLD_OUT") else None
     for _ in range(4):
         poll(list(SKUS), seen, None)
     emit = real
@@ -155,7 +168,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--storage", help="256GB|512GB|1TB|2TB")
     ap.add_argument("--color", help='"Night Sky" or "Star White"')
-    ap.add_argument("--interval", type=float, default=6, help="seconds between sweeps (default 6)")
+    ap.add_argument("--interval", type=float, default=4, help="seconds between sweeps (default 4)")
     ap.add_argument("--ntfy", help="optional ntfy.sh topic for direct phone push")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()

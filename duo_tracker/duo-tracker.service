@@ -1,0 +1,15 @@
+# Linux / Raspberry Pi: edit the path and topic, then
+#   sudo cp duo-tracker.service /etc/systemd/system/ && sudo systemctl enable --now duo-tracker
+#   journalctl -u duo-tracker -f     # watch it
+[Unit]
+Description=iPhone Duo stock tracker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 -u /home/pi/LeetCode/duo_tracker/duo_tracker.py --ntfy CHANGE-ME-long-random-topic
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

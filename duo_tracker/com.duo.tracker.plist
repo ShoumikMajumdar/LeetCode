@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- macOS: runs at login, restarts on crash. Edit the two paths and the ntfy topic, then:
+     cp com.duo.tracker.plist ~/Library/LaunchAgents/ && launchctl load ~/Library/LaunchAgents/com.duo.tracker.plist
+     Keep the Mac from sleeping: System Settings > Battery/Energy > prevent automatic sleeping when on power. -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.duo.tracker</string>
+  <key>ProgramArguments</key><array>
+    <string>/usr/bin/python3</string>
+    <string>/Users/YOU/LeetCode/duo_tracker/duo_tracker.py</string>
+    <string>--ntfy</string><string>CHANGE-ME-long-random-topic</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/Users/YOU/duo_tracker.log</string>
+  <key>StandardErrorPath</key><string>/Users/YOU/duo_tracker.log</string>
+</dict></plist>
