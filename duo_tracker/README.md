@@ -12,7 +12,15 @@ directly via ntfy, before anything else happens.
 3. Install as a service so it runs 24/7 and restarts itself: `com.duo.tracker.plist` (Mac) or
    `duo-tracker.service` (Linux / Raspberry Pi). Edit the paths and topic first.
 
-Filter: `--storage 512GB --color "Night Sky"`. Speed: `--interval 3` (lower = more likely Apple rate-limits you).
+Filter: `--storage 512GB --color "Night Sky"`. Speed: `--interval 5` is the default.
+
+## If Apple throttles you
+- At startup it checks each seed ZIP once and keeps only the fewest ZIPs that cover every store in range,
+  so a sweep is usually 2-3 requests, not 8.
+- A 403/429/503/541 or an HTML page instead of JSON counts as throttled: it doubles the wait (up to 10 min),
+  pushes **"Duo tracker throttled"** to your phone, then eases back and pushes **"Duo tracker back"**.
+- Blocks are on your IP address, not your Apple ID: buying still works from your phone on cellular.
+- If you get throttled often, raise `--interval` (8-10 s still beats InStock Radar's 20 s).
 
 ## Ordering fast
 Apple Store app signed in, Apple Pay default, pickup store picked. Tap the alert, then Reserve, then Face ID.
